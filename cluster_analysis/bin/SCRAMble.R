@@ -39,6 +39,8 @@ parser <- add_option(parser, c("-r", "--ref"), type="character",
                      default=NULL, dest="ref", help="reference file (fasta format) [default %default]")
 parser <- add_option(parser, c("--no-vcf"), action="store_true", default=FALSE,
                      type="logical", help="evaluate meis")
+parser <- add_option(parser, c("--cores"),  type="integer", default=1,
+                     dest="cores", help="number of CPU cores to utilize [default %default]")
 ## what to evaluate
 parser <- add_option(parser, c("--eval-meis"), action="store_true", default=FALSE,
                      type="logical", help="evaluate meis")
@@ -60,6 +62,7 @@ pctAlign        = opt[["pctAlign"]]
 polyAdist       = opt[["polyAdist"]] 
 blastRef        = opt[["ref"]]
 no.vcf          = opt[["no-vcf"]]
+cores           = opt[["cores"]]
 
 # what to evaluate
 meis        = opt[["eval-meis"]]
@@ -87,7 +90,7 @@ all$rname_clippedPos_Orientation_ReadSide = paste(all$RNAME, all$clipped_pos, al
 if(meis){
   source("do.meis.R")
   mei.winners=do.meis(all=all, meiScore=meiScore, refs=mei.refs,
-                  polyAFrac=polyAFrac, pctAlign=pctAlign, polyAdist=polyAdist)
+                  polyAFrac=polyAFrac, pctAlign=pctAlign, polyAdist=polyAdist, cores=cores)
   cat("Done analyzing MEIs\n")
   write.table(mei.winners, paste(outFilePrefix, "_MEIs.txt", sep=""), row.names=F, quote=F, sep="\t")  
 }

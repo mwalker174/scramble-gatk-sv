@@ -3,6 +3,7 @@
 #Alignment quality statistics are returned. Filtering thresholds are used to determine likely MEIs.
 library(stringr)
 library(Biostrings)
+library(dplyr)
 #############################################################
 ## performs pairwise alignments between vector of sequences and individual reference sequences
 ## returns data.frame with key stats on alignment
@@ -70,15 +71,23 @@ pick.winners = function(df, pct_read_aligned=75, meiScore=50){
   return(winners)
 } ## END OF FUNCTION
 ##################################################################
-do.meis = function(all,  refs, polyAFrac=0.5, meiScore=50,
-                   pctAlign=70, polyAdist=200){
-  mobilome = make.mobilome(refs)
-  df.all = all[all$counts >= nCluster , ] ## INCLUDE SIMPLE SEQUENCE FOR MEI SEARCH
-  df.all$clipped.consensus.rc = rc(df.all$clipped.consensus)
+parallel.meis = function(df.all, mobilome) {
   alignments_fwd = aligner(my.fa=df.all$clipped.consensus, ref=mobilome)
   alignments_rev = aligner(my.fa=df.all$clipped.consensus.rc, ref=mobilome, rc=T)
   df.aligned = rbind.data.frame(data.frame(df.all, alignments_fwd,stringsAsFactors = F, row.names=NULL),
                                 data.frame(df.all, alignments_rev, stringsAsFactors = F, row.names=NULL) )
+  return(df.aligned)
+}
+
+do.meis = function(all,  refs, polyAFrac=0.5, meiScore=50,
+                   pctAlign=70, polyAdist=200, cores=1){
+  mobilome = make.mobilome(refs)
+  df.all = all[all$counts >= nCluster , ] ## INCLUDE SIMPLE SEQUENCE FOR MEI SEARCH
+  df.all$clipped.consensus.rc = rc(df.all$clipped.consensus)
+
+  n_chunks = ceiling(nrow(df.all)/cores)
+  df.all_chunks = split(df.all, ceiling(1:nrow(df.all)/n_chunks))
+  df.aligned = bind_rows(mclapply(df.all_chunks, function(x) {parallel.meis(df.all=x, mobilome=mobilome)}, mc.cores=cores))
 
   ## Make pretty output table
   df.aligned$coord = paste(df.all$RNAME, df.all$clipped_pos, sep=":")
