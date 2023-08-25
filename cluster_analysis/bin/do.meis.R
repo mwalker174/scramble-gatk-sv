@@ -90,7 +90,7 @@ do.meis = function(all,  refs, polyAFrac=0.5, meiScore=50,
   df.aligned = bind_rows(mclapply(df.all_chunks, function(x) {parallel.meis(df.all=x, mobilome=mobilome)}, mc.cores=cores))
 
   ## Make pretty output table
-  df.aligned$coord = paste(df.all$RNAME, df.all$clipped_pos, sep=":")
+  df.aligned$coord = paste(df.aligned$RNAME, df.aligned$clipped_pos, sep=":")
   winners = as.data.frame(pick.winners(df.aligned,  pct_read_aligned=pctAlign, meiScore=meiScore) )
   cat("Sample had", nrow(winners), "MEI(s)\n")
   
