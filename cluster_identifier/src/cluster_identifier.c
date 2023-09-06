@@ -8,6 +8,8 @@
 #include "htslib/hts.h"
 #include "htslib/sam.h"
 #include "htslib/cram.h"
+#include "htslib/faidx.h"
+#include "htslib/hts_log.h"
 
 /*
   ./soft_clipped_clusters file.bam
@@ -74,20 +76,28 @@ static void print_left_align( char**, int ) __attribute__ ((unused));
 static void print_right_align( int, char**, int ) __attribute__ ((unused));
 
 static void usage(const char *argv0) {
-    fprintf(stderr, "Usage: %s [-m min soft clipped bases] [-s min soft clipped reads] [-r region] cram/bam\n", argv0 );
+    fprintf(stderr, "Usage: %s [-t reference fasta for cram] [-l show detailed logs] [-m min soft clipped bases] [-s min soft clipped reads] [-r region] cram/bam\n", argv0 );
     exit(EXIT_FAILURE);
 }
 
 int main( int argc, char** argv) {
     
     int c;
+    char *ref_file = NULL;
     int min_sc_bases = 10;
     int min_sc_reads = 5;
     bool debug = false;
     char *region = "all";
 
-    while( (c = getopt(argc, argv, "m:s:r:v")) != -1 ) {
+    while( (c = getopt(argc, argv, "t:lm:s:r:v")) != -1 ) {
         switch(c) {
+            case 't':
+                ref_file = optarg;
+                break;
+            case 'l':
+                debug = true;
+                hts_set_log_level(HTS_LOG_TRACE);
+                break;
             case 'm':
                 min_sc_bases = atoi(optarg);
                 break;
@@ -126,13 +136,45 @@ int main( int argc, char** argv) {
         .debug = debug
     };
 
+    htsFormat fmt1 = {0};
+    if (ref_file) {
+        int ref_arg_size = sizeof(char) * (strlen(ref_file) + sizeof("cram,reference=") + 1);
+        char *ref_format = malloc(ref_arg_size);
+        if (!ref_format) {
+            fprintf(stderr, "Could not create ref format buffer\n");
+            exit(1);
+        }
+        snprintf(ref_format, ref_arg_size, "cram,reference=%s", ref_file);
+        if (hts_parse_format(&fmt1, ref_format) == -1) {
+            fprintf(stderr, "Failed to set input format option %s\n", ref_format);
+            exit(1);
+        }
+        free(ref_format);
+    }
+
     // Open file and index and create header object.
-    htsFile *in_fp = hts_open( fn, "r");
-    hts_idx_t *idx = sam_index_load( in_fp, fn ); 
+    htsFile *in_fp = hts_open_format( fn, "r", &fmt1);
+
+    if (!in_fp) {
+        fprintf( stderr, "Could not open alignment file %s\n", fn);
+        exit(2);
+    }
+
+    hts_idx_t *idx = sam_index_load( in_fp, fn );
 
     if( idx == NULL ) {
         fprintf( stderr, "Could not find index for input alignment file %s\n", fn);
+        hts_close(in_fp);
         exit(2);
+    }
+
+    if (ref_file) {
+        const char* fai = fai_path(ref_file);
+        if (hts_set_fai_filename(in_fp, fai) != 0) {
+            fprintf( stderr, "Could not set fasta index %s\n", fai);
+            hts_close(in_fp);
+            exit(1);
+        }
     }
 
     bam_hdr_t *header = sam_hdr_read( in_fp );
@@ -184,7 +226,6 @@ static void process_region( htsFile *in_fp, hts_idx_t *idx, bam_hdr_t *header, c
         prev_map_pos = b->core.pos;
 
         if( is_soft_clipped( b ) ) {
-
             // Filter 
             if( b->core.qual == 0 || b->core.flag & BAM_FDUP ) {
                 continue;
