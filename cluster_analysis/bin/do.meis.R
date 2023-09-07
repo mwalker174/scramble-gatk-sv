@@ -4,6 +4,7 @@
 library(stringr)
 library(Biostrings)
 library(dplyr)
+library(parallel)
 #############################################################
 ## performs pairwise alignments between vector of sequences and individual reference sequences
 ## returns data.frame with key stats on alignment
