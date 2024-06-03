@@ -38,7 +38,7 @@ RUN apt-get clean && \
 
 # install global r requirements
 RUN echo "r <- getOption('repos'); r['CRAN'] <- 'http://cran.us.r-project.org'; options(repos = r);" > ~/.Rprofile
-RUN Rscript -e "library(devtools); install_github('mhahsler/rBLAST')"
+RUN Rscript -e "library(devtools); install_github('mhahsler/rBLAST', ref='devel')"
 
 # install scramble
 COPY . /app
