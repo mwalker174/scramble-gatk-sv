@@ -227,7 +227,7 @@ static void process_region( htsFile *in_fp, hts_idx_t *idx, bam_hdr_t *header, c
 
         if( is_soft_clipped( b ) ) {
             // Filter 
-            if( b->core.qual == 0 || b->core.flag & BAM_FDUP ) {
+            if( b->core.qual == 0 || b->core.flag & (BAM_FDUP | BAM_FSECONDARY | BAM_FSUPPLEMENTARY) ) {
                 continue;
             }
 
