@@ -169,7 +169,10 @@ int main( int argc, char** argv) {
     }
 
     if (ref_file) {
-        const char* fai = fai_path(ref_file);
+        const char* fai_suffix = ".fai";
+        char* fai = (char*)malloc(strlen(ref_file) + strlen(fai_suffix));
+        strcpy(fai, ref_file);
+        strcat(fai, fai_suffix);
         if (hts_set_fai_filename(in_fp, fai) != 0) {
             fprintf( stderr, "Could not set fasta index %s\n", fai);
             hts_close(in_fp);
