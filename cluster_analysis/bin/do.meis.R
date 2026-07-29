@@ -3,6 +3,24 @@
 #Alignment quality statistics are returned. Filtering thresholds are used to determine likely MEIs.
 library(stringr)
 library(Biostrings)
+# As of Bioconductor 3.19 (R 4.4+), pairwiseAlignment() and pid() were moved
+# out of Biostrings into the pwalign package. Attach pwalign when it is
+# installed; on older Biostrings that still export these functions, skip it.
+if (requireNamespace("pwalign", quietly = TRUE)) {
+  library(pwalign)
+}
+# Fail fast if pairwiseAlignment() is unreachable. Without this check the
+# mclapply() workers below would each raise the error silently, bind_rows()
+# would then return an empty tibble, and downstream code would explode with
+# an opaque `Assigned data has 0 rows` message from tibble.
+if (!exists("pairwiseAlignment", mode = "function")) {
+  stop(
+    "pairwiseAlignment() is not available. Since Bioconductor 3.19 (R 4.4+) ",
+    "it lives in the 'pwalign' package. Install it with:\n",
+    "    Rscript -e \"if (!requireNamespace('BiocManager', quietly=TRUE)) install.packages('BiocManager'); BiocManager::install('pwalign', ask=FALSE, update=FALSE)\"",
+    call. = FALSE
+  )
+}
 library(dplyr)
 library(parallel)
 #############################################################
@@ -88,7 +106,27 @@ do.meis = function(all,  refs, polyAFrac=0.5, meiScore=50,
 
   n_chunks = ceiling(nrow(df.all)/cores)
   df.all_chunks = split(df.all, ceiling(1:nrow(df.all)/n_chunks))
-  df.aligned = bind_rows(mclapply(df.all_chunks, function(x) {parallel.meis(df.all=x, mobilome=mobilome)}, mc.cores=cores))
+  # mclapply() with mc.preschedule=TRUE swallows worker errors and returns
+  # them as try-error values, which downstream code then blindly bind_rows()
+  # into an empty tibble. Force serial execution when cores==1 (so any error
+  # propagates directly) and, when parallel, detect try-errors explicitly and
+  # re-raise the first one so we see the real underlying failure.
+  worker = function(x) parallel.meis(df.all = x, mobilome = mobilome)
+  if (cores <= 1) {
+    chunk_results = lapply(df.all_chunks, worker)
+  } else {
+    chunk_results = mclapply(df.all_chunks, worker, mc.cores = cores)
+    bad = vapply(chunk_results, inherits, logical(1), what = "try-error")
+    if (any(bad)) {
+      stop(
+        "MEI alignment worker failed in ", sum(bad), " of ",
+        length(chunk_results), " chunk(s). First error:\n",
+        attr(chunk_results[[which(bad)[1]]], "condition")$message,
+        call. = FALSE
+      )
+    }
+  }
+  df.aligned = bind_rows(chunk_results)
 
   ## Make pretty output table
   df.aligned$coord = paste(df.aligned$RNAME, df.aligned$clipped_pos, sep=":")
