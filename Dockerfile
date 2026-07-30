@@ -39,6 +39,10 @@ RUN apt-get clean && \
 # install global r requirements
 RUN echo "r <- getOption('repos'); r['CRAN'] <- 'https://cloud.r-project.org'; options(repos = r);" > ~/.Rprofile
 RUN Rscript -e "library(devtools); install_github('mhahsler/rBLAST', ref='devel')"
+# pairwiseAlignment() / pid() moved from Biostrings to pwalign in Bioconductor
+# 3.19 (R 4.4+). Install pwalign so SCRAMble.R works on modern R versions.
+# `require(...)` short-circuits when it is already available from the OS pkg.
+RUN Rscript -e "if (!requireNamespace('pwalign', quietly = TRUE)) BiocManager::install('pwalign', ask = FALSE, update = FALSE)"
 
 # install scramble
 COPY . /app

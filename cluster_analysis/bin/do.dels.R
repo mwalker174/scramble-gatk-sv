@@ -1,4 +1,20 @@
 ## FIND DELETIONS
+# As of Bioconductor 3.19 (R 4.4+), pairwiseAlignment() and pid() were moved
+# out of Biostrings into the pwalign package. Attach it when installed.
+if (requireNamespace("pwalign", quietly = TRUE)) {
+  suppressPackageStartupMessages(library(pwalign))
+}
+# Fail fast if pairwiseAlignment() is unreachable so downstream code doesn't
+# produce a cryptic tibble recycling error.
+if (!exists("pairwiseAlignment", mode = "function")) {
+  stop(
+    "pairwiseAlignment() is not available. Since Bioconductor 3.19 (R 4.4+) ",
+    "it lives in the 'pwalign' package. Install it with:\n",
+    "    Rscript -e \"if (!requireNamespace('BiocManager', quietly=TRUE)) install.packages('BiocManager'); BiocManager::install('pwalign', ask=FALSE, update=FALSE)\"",
+    call. = FALSE
+  )
+}
+
 del.finder = function(dat){
   print(paste("Two-End-Deletions: Working on contig", unique(dat$RNAME)))
   # find right clipped clusters upstream of left clipped clusters
